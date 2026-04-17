@@ -58,6 +58,36 @@ npm run dev
 
 `http://localhost:3000`
 
+## Deploy with Docker Compose (VPS)
+
+This project includes a production `Dockerfile` and `docker-compose.yml`.
+
+1. On your VPS, clone the repo and go into the project directory.
+2. Build and run:
+
+```bash
+docker compose up -d --build
+```
+
+3. Open:
+
+`http://YOUR_VPS_IP:3000`
+
+Useful commands:
+
+```bash
+docker compose logs -f
+docker compose pull
+docker compose up -d --build
+docker compose down
+```
+
+Notes:
+
+- The container image installs both `ffmpeg` and `yt-dlp`.
+- The app runs in production mode and listens on port `3000`.
+- Change host port mapping in `docker-compose.yml` if needed.
+
 ## How to Use
 
 1. Paste a valid YouTube or TikTok URL.
