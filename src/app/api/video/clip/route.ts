@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server";
 import {
   assertBinaryExists,
-  createClipFromYouTube,
+  createClipFromVideoUrl,
   readFileAsBuffer,
   toDownloadName,
   UserInputError,
 } from "@/lib/youtube";
-import { isClipResolution, parseYouTubeVideoId } from "@/lib/shared";
+import { getSupportedVideoPlatform, isClipResolution } from "@/lib/shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,15 +29,15 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "URL, startSeconds and endSeconds are required." }, { status: 400 });
     }
 
-    if (!parseYouTubeVideoId(body.url)) {
-      return Response.json({ error: "Please provide a valid YouTube URL." }, { status: 400 });
+    if (!getSupportedVideoPlatform(body.url)) {
+      return Response.json({ error: "Please provide a valid YouTube or TikTok URL." }, { status: 400 });
     }
 
     if (body.resolution !== undefined && !isClipResolution(body.resolution)) {
       return Response.json({ error: "Please provide a valid resolution option." }, { status: 400 });
     }
 
-    const clipResult = await createClipFromYouTube({
+    const clipResult = await createClipFromVideoUrl({
       url: body.url,
       startSeconds: body.startSeconds,
       endSeconds: body.endSeconds,

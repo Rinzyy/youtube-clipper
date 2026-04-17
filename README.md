@@ -1,15 +1,15 @@
-# YouTube Clipper (MVP)
+# Video Clipper (MVP)
 
-Local-first web app to clip a specific timerange from a YouTube video and download it as MP4.
+Local-first web app to clip a specific timerange from a YouTube or TikTok video and download it as MP4.
 
 Built with Next.js (App Router) and Node.js route handlers.
 
 ## Features
 
-- Paste a YouTube URL and fetch metadata (title, duration, thumbnail)
+- Paste a YouTube or TikTok URL and fetch metadata (title, duration, thumbnail)
 - Preview the video in-app before clipping
 - Choose clip range with sliders and `mm:ss` inputs
-- Set start/end from the current playback time
+- Set start/end from the current playback time (YouTube player)
 - Download clipped output as MP4
 - Temporary server-side file workspace with cleanup
 
@@ -60,10 +60,10 @@ npm run dev
 
 ## How to Use
 
-1. Paste a valid YouTube URL.
+1. Paste a valid YouTube or TikTok URL.
 2. Click **Load Video**.
 3. Use sliders and/or `mm:ss` inputs to set start/end.
-4. Optionally use **Set Start from Current** / **Set End from Current** while previewing.
+4. For YouTube, optionally use **Set Start from Current** / **Set End from Current** while previewing.
 5. Click **Download Clip** to generate and download MP4.
 
 ## API Overview
@@ -83,6 +83,7 @@ Output:
   "title": "Video title",
   "duration": 372,
   "thumbnail": "https://...",
+  "platform": "youtube",
   "videoId": "abcdefghijk"
 }
 ```
@@ -116,7 +117,7 @@ Response: MP4 file stream/download.
 
 ## Open Source Notes
 
-- Please respect YouTube Terms of Service and copyright laws in your jurisdiction.
+- Please respect platform Terms of Service and copyright laws in your jurisdiction.
 - This project is intended for legitimate personal workflow and educational use.
 
 ## Contributing

@@ -2,7 +2,10 @@ export const MAX_CLIP_SECONDS = 5 * 60;
 
 export const CLIP_RESOLUTIONS = ["source", "1080p", "720p", "480p", "360p"] as const;
 
+export const SUPPORTED_VIDEO_PLATFORMS = ["youtube", "tiktok"] as const;
+
 export type ClipResolution = (typeof CLIP_RESOLUTIONS)[number];
+export type SupportedVideoPlatform = (typeof SUPPORTED_VIDEO_PLATFORMS)[number];
 
 export function isClipResolution(value: unknown): value is ClipResolution {
   return typeof value === "string" && CLIP_RESOLUTIONS.includes(value as ClipResolution);
@@ -34,6 +37,48 @@ export function parseYouTubeVideoId(input: string): string | null {
   if (host === "youtu.be") {
     const path = url.pathname.split("/").filter(Boolean)[0] ?? "";
     return isValidVideoId(path) ? path : null;
+  }
+
+  return null;
+}
+
+export function isTikTokUrl(input: string): boolean {
+  let url: URL;
+
+  try {
+    url = new URL(input);
+  } catch {
+    return false;
+  }
+
+  const host = url.hostname.replace("www.", "").replace("m.", "").toLowerCase();
+  return host === "tiktok.com" || host === "vm.tiktok.com" || host === "vt.tiktok.com";
+}
+
+export function parseTikTokVideoId(input: string): string | null {
+  if (!isTikTokUrl(input)) {
+    return null;
+  }
+
+  let url: URL;
+
+  try {
+    url = new URL(input);
+  } catch {
+    return null;
+  }
+
+  const match = url.pathname.match(/\/video\/(\d+)/);
+  return match?.[1] ?? null;
+}
+
+export function getSupportedVideoPlatform(input: string): SupportedVideoPlatform | null {
+  if (parseYouTubeVideoId(input)) {
+    return "youtube";
+  }
+
+  if (isTikTokUrl(input)) {
+    return "tiktok";
   }
 
   return null;

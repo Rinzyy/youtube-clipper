@@ -6,15 +6,19 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import {
   ClipResolution,
+  getSupportedVideoPlatform,
   MAX_CLIP_SECONDS,
+  parseTikTokVideoId,
   parseYouTubeVideoId,
+  SupportedVideoPlatform,
 } from "@/lib/shared";
 
 export type VideoMetadata = {
   title: string;
   duration: number;
   thumbnail: string;
-  videoId: string;
+  platform: SupportedVideoPlatform;
+  videoId: string | null;
 };
 
 type CommandResult = {
@@ -41,6 +45,8 @@ export class UserInputError extends Error {
     this.name = "UserInputError";
   }
 }
+
+export const createClipFromYouTube = createClipFromVideoUrl;
 
 function getScaleFilter(resolution: ClipResolution | undefined): string | null {
   if (!resolution || resolution === "source") {
@@ -86,16 +92,16 @@ export function validateClipRange(startSeconds: number, endSeconds: number, dura
 
 export async function getVideoMetadata(url: string): Promise<VideoMetadata> {
   const ytDlpBinary = await resolveBinaryPath("yt-dlp");
-  const videoId = parseYouTubeVideoId(url);
-  if (!videoId) {
-    throw new UserInputError("Please provide a valid YouTube URL.");
+  const platform = getSupportedVideoPlatform(url);
+  if (!platform) {
+    throw new UserInputError("Please provide a valid YouTube or TikTok URL.");
   }
 
   const { stdout } = await runCommand(ytDlpBinary, [
     "--dump-single-json",
     "--no-warnings",
     "--no-playlist",
-    `https://www.youtube.com/watch?v=${videoId}`,
+    url,
   ]);
 
   const data = JSON.parse(stdout) as {
@@ -109,16 +115,26 @@ export async function getVideoMetadata(url: string): Promise<VideoMetadata> {
     throw new Error("Unable to read video metadata.");
   }
 
+  const videoId =
+    platform === "youtube"
+      ? parseYouTubeVideoId(url) ?? data.id
+      : parseTikTokVideoId(url) ?? data.id;
+
+  const fallbackThumbnail =
+    platform === "youtube" && videoId
+      ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+      : "";
+
   return {
     title: data.title,
     duration: data.duration,
-    thumbnail:
-      data.thumbnail ?? `https://i.ytimg.com/vi/${data.id}/hqdefault.jpg`,
-    videoId: data.id,
+    thumbnail: data.thumbnail ?? fallbackThumbnail,
+    platform,
+    videoId,
   };
 }
 
-export async function createClipFromYouTube(options: {
+export async function createClipFromVideoUrl(options: {
   url: string;
   startSeconds: number;
   endSeconds: number;
@@ -150,7 +166,7 @@ export async function createClipFromYouTube(options: {
       "mp4",
       "-o",
       sourceTemplatePath,
-      `https://www.youtube.com/watch?v=${metadata.videoId}`,
+      options.url,
     ]);
 
     const sourceFilePath = await resolveDownloadedSourceFile(workspaceDir);

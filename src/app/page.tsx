@@ -6,9 +6,10 @@ import {
   CLIP_RESOLUTIONS,
   ClipResolution,
   formatTimestamp,
+  getSupportedVideoPlatform,
   MAX_CLIP_SECONDS,
   parseTimestamp,
-  parseYouTubeVideoId,
+  SupportedVideoPlatform,
 } from "@/lib/shared";
 import styles from "./page.module.css";
 
@@ -16,7 +17,8 @@ type VideoMetadata = {
   title: string;
   duration: number;
   thumbnail: string;
-  videoId: string;
+  platform: SupportedVideoPlatform;
+  videoId: string | null;
 };
 
 type UiStatus = "idle" | "fetching" | "ready" | "clipping";
@@ -36,7 +38,8 @@ export default function Home() {
   const pollTimerRef = useRef<number | null>(null);
 
   const clipLength = Math.max(0, endSeconds - startSeconds);
-  const hasVideoId = useMemo(() => parseYouTubeVideoId(urlInput), [urlInput]);
+  const detectedPlatform = useMemo(() => getSupportedVideoPlatform(urlInput), [urlInput]);
+  const canUseYouTubePlayer = metadata?.platform === "youtube" && Boolean(metadata.videoId);
 
   useEffect(() => {
     return () => {
@@ -45,6 +48,19 @@ export default function Home() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (canUseYouTubePlayer) {
+      return;
+    }
+
+    if (pollTimerRef.current !== null) {
+      window.clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+
+    ytPlayerRef.current = null;
+  }, [canUseYouTubePlayer]);
 
   async function handleFetchMetadata() {
     setError(null);
@@ -107,7 +123,7 @@ export default function Home() {
   }
 
   function setTimeFromPlayer(target: "start" | "end") {
-    if (!metadata) {
+    if (!metadata || !canUseYouTubePlayer) {
       return;
     }
 
@@ -170,32 +186,32 @@ export default function Home() {
     <div className={styles.page}>
       <main className={styles.main}>
         <header className={styles.hero}>
-          <p className={styles.kicker}>YouTube Clipper</p>
+          <p className={styles.kicker}>Video Clipper</p>
           <h1>Clip exactly what you need, then download as MP4.</h1>
-          <p>Paste a YouTube link, preview it, pick your start and end, and export in one step.</p>
+          <p>Paste a YouTube or TikTok link, preview it, pick your start and end, and export in one step.</p>
         </header>
 
         <section className={styles.panel}>
-          <label className={styles.label} htmlFor="youtube-url">
-            YouTube URL
+          <label className={styles.label} htmlFor="video-url">
+            Video URL
           </label>
           <div className={styles.urlRow}>
             <input
-              id="youtube-url"
+              id="video-url"
               className={styles.input}
-              placeholder="https://www.youtube.com/watch?v=..."
+              placeholder="https://www.youtube.com/watch?v=... or https://www.tiktok.com/..."
               value={urlInput}
               onChange={(event) => setUrlInput(event.target.value)}
             />
             <button
               className={styles.buttonPrimary}
               onClick={handleFetchMetadata}
-              disabled={!hasVideoId || status === "fetching" || status === "clipping"}
+              disabled={!detectedPlatform || status === "fetching" || status === "clipping"}
             >
               {status === "fetching" ? "Loading..." : "Load Video"}
             </button>
           </div>
-          <p className={styles.helper}>Supports youtube.com and youtu.be links.</p>
+          <p className={styles.helper}>Supports youtube.com, youtu.be, and tiktok.com links.</p>
           {error ? <p className={styles.error}>{error}</p> : null}
         </section>
 
@@ -203,45 +219,57 @@ export default function Home() {
           <section className={styles.editor}>
             <div className={styles.previewCard}>
               <div className={styles.playerFrame}>
-                <YouTube
-                  videoId={metadata.videoId}
-                  opts={{
-                    width: "100%",
-                    height: "100%",
-                    playerVars: {
-                      modestbranding: 1,
-                      rel: 0,
-                    },
-                  }}
-                  className={styles.youtube}
-                  iframeClassName={styles.youtubeFrame}
-                  onReady={(event: YouTubeEvent) => {
-                    ytPlayerRef.current = event.target;
-                  }}
-                  onStateChange={(event: YouTubeEvent<number>) => {
-                    const isPlaying = event.data === 1;
+                {metadata.platform === "youtube" && metadata.videoId ? (
+                  <YouTube
+                    videoId={metadata.videoId}
+                    opts={{
+                      width: "100%",
+                      height: "100%",
+                      playerVars: {
+                        modestbranding: 1,
+                        rel: 0,
+                      },
+                    }}
+                    className={styles.youtube}
+                    iframeClassName={styles.youtubeFrame}
+                    onReady={(event: YouTubeEvent) => {
+                      ytPlayerRef.current = event.target;
+                    }}
+                    onStateChange={(event: YouTubeEvent<number>) => {
+                      const isPlaying = event.data === 1;
 
-                    if (!isPlaying) {
-                      if (pollTimerRef.current !== null) {
-                        window.clearInterval(pollTimerRef.current);
-                        pollTimerRef.current = null;
-                      }
-                      return;
-                    }
-
-                    if (pollTimerRef.current !== null) {
-                      window.clearInterval(pollTimerRef.current);
-                    }
-
-                    pollTimerRef.current = window.setInterval(() => {
-                      if (!ytPlayerRef.current) {
+                      if (!isPlaying) {
+                        if (pollTimerRef.current !== null) {
+                          window.clearInterval(pollTimerRef.current);
+                          pollTimerRef.current = null;
+                        }
                         return;
                       }
 
-                      setCurrentTime(Math.floor(ytPlayerRef.current.getCurrentTime()));
-                    }, 300);
-                  }}
-                />
+                      if (pollTimerRef.current !== null) {
+                        window.clearInterval(pollTimerRef.current);
+                      }
+
+                      pollTimerRef.current = window.setInterval(() => {
+                        if (!ytPlayerRef.current) {
+                          return;
+                        }
+
+                        setCurrentTime(Math.floor(ytPlayerRef.current.getCurrentTime()));
+                      }, 300);
+                    }}
+                  />
+                ) : metadata.platform === "tiktok" && metadata.videoId ? (
+                  <iframe
+                    className={styles.youtubeFrame}
+                    src={`https://www.tiktok.com/embed/v2/${metadata.videoId}`}
+                    title={metadata.title}
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen
+                  />
+                ) : (
+                  <div className={styles.youtubeFrame} />
+                )}
               </div>
 
               <div className={styles.videoMeta}>
@@ -249,7 +277,11 @@ export default function Home() {
                 <div>
                   <h2>{metadata.title}</h2>
                   <p>Duration: {formatTimestamp(metadata.duration)}</p>
-                  <p>Current: {formatTimestamp(currentTime)}</p>
+                  {canUseYouTubePlayer ? (
+                    <p>Current: {formatTimestamp(currentTime)}</p>
+                  ) : (
+                    <p>Use sliders or manual input to set clip times.</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -307,14 +339,16 @@ export default function Home() {
                 </label>
               </div>
 
-              <div className={styles.quickActions}>
-                <button onClick={() => setTimeFromPlayer("start")} disabled={status === "clipping"}>
-                  Set Start from Current
-                </button>
-                <button onClick={() => setTimeFromPlayer("end")} disabled={status === "clipping"}>
-                  Set End from Current
-                </button>
-              </div>
+              {canUseYouTubePlayer ? (
+                <div className={styles.quickActions}>
+                  <button onClick={() => setTimeFromPlayer("start")} disabled={status === "clipping"}>
+                    Set Start from Current
+                  </button>
+                  <button onClick={() => setTimeFromPlayer("end")} disabled={status === "clipping"}>
+                    Set End from Current
+                  </button>
+                </div>
+              ) : null}
 
               <p className={styles.summary}>
                 Selected clip: <strong>{formatTimestamp(startSeconds)}</strong> → <strong>{formatTimestamp(endSeconds)}</strong> ({formatTimestamp(clipLength)})
