@@ -1,5 +1,13 @@
 export const MAX_CLIP_SECONDS = 5 * 60;
 
+export const CLIP_RESOLUTIONS = ["source", "1080p", "720p", "480p", "360p"] as const;
+
+export type ClipResolution = (typeof CLIP_RESOLUTIONS)[number];
+
+export function isClipResolution(value: unknown): value is ClipResolution {
+  return typeof value === "string" && CLIP_RESOLUTIONS.includes(value as ClipResolution);
+}
+
 export function parseYouTubeVideoId(input: string): string | null {
   let url: URL;
 
@@ -12,6 +20,13 @@ export function parseYouTubeVideoId(input: string): string | null {
   const host = url.hostname.replace("www.", "").toLowerCase();
 
   if (host === "youtube.com" || host === "m.youtube.com") {
+    const pathSegments = url.pathname.split("/").filter(Boolean);
+
+    if (pathSegments[0] === "shorts") {
+      const id = pathSegments[1] ?? "";
+      return isValidVideoId(id) ? id : null;
+    }
+
     const id = url.searchParams.get("v");
     return isValidVideoId(id) ? id : null;
   }

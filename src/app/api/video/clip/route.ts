@@ -6,7 +6,7 @@ import {
   toDownloadName,
   UserInputError,
 } from "@/lib/youtube";
-import { parseYouTubeVideoId } from "@/lib/shared";
+import { isClipResolution, parseYouTubeVideoId } from "@/lib/shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
       url?: string;
       startSeconds?: number;
       endSeconds?: number;
+      resolution?: string;
     };
 
     if (!body.url || typeof body.startSeconds !== "number" || typeof body.endSeconds !== "number") {
@@ -32,10 +33,15 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Please provide a valid YouTube URL." }, { status: 400 });
     }
 
+    if (body.resolution !== undefined && !isClipResolution(body.resolution)) {
+      return Response.json({ error: "Please provide a valid resolution option." }, { status: 400 });
+    }
+
     const clipResult = await createClipFromYouTube({
       url: body.url,
       startSeconds: body.startSeconds,
       endSeconds: body.endSeconds,
+      resolution: body.resolution,
     });
 
     cleanup = clipResult.cleanup;

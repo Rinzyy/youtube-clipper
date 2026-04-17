@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import YouTube, { YouTubeEvent } from "react-youtube";
-import { formatTimestamp, MAX_CLIP_SECONDS, parseTimestamp, parseYouTubeVideoId } from "@/lib/shared";
+import {
+  CLIP_RESOLUTIONS,
+  ClipResolution,
+  formatTimestamp,
+  MAX_CLIP_SECONDS,
+  parseTimestamp,
+  parseYouTubeVideoId,
+} from "@/lib/shared";
 import styles from "./page.module.css";
 
 type VideoMetadata = {
@@ -23,6 +30,7 @@ export default function Home() {
   const [endSeconds, setEndSeconds] = useState(0);
   const [startInput, setStartInput] = useState("00:00");
   const [endInput, setEndInput] = useState("00:30");
+  const [resolution, setResolution] = useState<ClipResolution>("source");
   const [currentTime, setCurrentTime] = useState(0);
   const ytPlayerRef = useRef<{ getCurrentTime: () => number } | null>(null);
   const pollTimerRef = useRef<number | null>(null);
@@ -135,6 +143,7 @@ export default function Home() {
           url: urlInput,
           startSeconds,
           endSeconds,
+          resolution,
         }),
       });
 
@@ -310,6 +319,21 @@ export default function Home() {
               <p className={styles.summary}>
                 Selected clip: <strong>{formatTimestamp(startSeconds)}</strong> → <strong>{formatTimestamp(endSeconds)}</strong> ({formatTimestamp(clipLength)})
               </p>
+              <label className={styles.selectLabel}>
+                Resolution
+                <select
+                  className={styles.selectInput}
+                  value={resolution}
+                  onChange={(event) => setResolution(event.target.value as ClipResolution)}
+                  disabled={status === "clipping"}
+                >
+                  {CLIP_RESOLUTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option === "source" ? "Source (original)" : option}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <p className={styles.helper}>Max clip length: {formatTimestamp(MAX_CLIP_SECONDS)}</p>
 
               <button

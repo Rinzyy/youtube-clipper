@@ -5,6 +5,7 @@ import { access, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import {
+  ClipResolution,
   MAX_CLIP_SECONDS,
   parseYouTubeVideoId,
 } from "@/lib/shared";
@@ -39,6 +40,22 @@ export class UserInputError extends Error {
     super(message);
     this.name = "UserInputError";
   }
+}
+
+function getScaleFilter(resolution: ClipResolution | undefined): string | null {
+  if (!resolution || resolution === "source") {
+    return null;
+  }
+
+  const maxHeightMap: Record<Exclude<ClipResolution, "source">, number> = {
+    "1080p": 1080,
+    "720p": 720,
+    "480p": 480,
+    "360p": 360,
+  };
+
+  const maxHeight = maxHeightMap[resolution];
+  return `scale='min(iw,${maxHeight}*a/1)':'min(ih,${maxHeight})':force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2`;
 }
 
 export async function assertBinaryExists(binary: "yt-dlp" | "ffmpeg") {
@@ -105,6 +122,7 @@ export async function createClipFromYouTube(options: {
   url: string;
   startSeconds: number;
   endSeconds: number;
+  resolution?: ClipResolution;
 }): Promise<{ outputFilePath: string; cleanup: () => Promise<void> }> {
   const ytDlpBinary = await resolveBinaryPath("yt-dlp");
   const ffmpegBinary = await resolveBinaryPath("ffmpeg");
@@ -137,7 +155,7 @@ export async function createClipFromYouTube(options: {
 
     const sourceFilePath = await resolveDownloadedSourceFile(workspaceDir);
 
-    await runCommand(ffmpegBinary, [
+    const ffmpegArgs = [
       "-y",
       "-ss",
       String(options.startSeconds),
@@ -145,6 +163,14 @@ export async function createClipFromYouTube(options: {
       String(options.endSeconds),
       "-i",
       sourceFilePath,
+    ];
+
+    const scaleFilter = getScaleFilter(options.resolution);
+    if (scaleFilter) {
+      ffmpegArgs.push("-vf", scaleFilter);
+    }
+
+    ffmpegArgs.push(
       "-c:v",
       "libx264",
       "-preset",
@@ -156,7 +182,9 @@ export async function createClipFromYouTube(options: {
       "-movflags",
       "+faststart",
       clipPath,
-    ]);
+    );
+
+    await runCommand(ffmpegBinary, ffmpegArgs);
 
     return { outputFilePath: clipPath, cleanup };
   } catch (error) {
