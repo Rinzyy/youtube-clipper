@@ -17,7 +17,10 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ffmpeg yt-dlp ca-certificates \
+  && apt-get install -y --no-install-recommends ffmpeg ca-certificates python3 python3-venv \
+  && python3 -m venv /opt/yt-dlp \
+  && /opt/yt-dlp/bin/pip install --upgrade pip yt-dlp \
+  && ln -s /opt/yt-dlp/bin/yt-dlp /usr/local/bin/yt-dlp \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/.next/standalone ./
