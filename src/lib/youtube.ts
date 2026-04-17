@@ -21,6 +21,19 @@ type CommandResult = {
   stderr: string;
 };
 
+const BINARY_PATH_OVERRIDES: Record<"yt-dlp" | "ffmpeg", string[]> = {
+  "yt-dlp": [
+    process.env.YT_DLP_PATH ?? "",
+    "/opt/homebrew/bin/yt-dlp",
+    "/usr/local/bin/yt-dlp",
+  ],
+  ffmpeg: [
+    process.env.FFMPEG_PATH ?? "",
+    "/opt/homebrew/bin/ffmpeg",
+    "/usr/local/bin/ffmpeg",
+  ],
+};
+
 export class UserInputError extends Error {
   constructor(message: string) {
     super(message);
@@ -29,13 +42,7 @@ export class UserInputError extends Error {
 }
 
 export async function assertBinaryExists(binary: "yt-dlp" | "ffmpeg") {
-  try {
-    await runCommand(binary, ["--version"]);
-  } catch {
-    throw new Error(
-      `${binary} is not installed or not available in PATH. Please install ${binary} before running this app.`,
-    );
-  }
+  await resolveBinaryPath(binary);
 }
 
 export function validateClipRange(startSeconds: number, endSeconds: number, duration: number) {
@@ -61,12 +68,13 @@ export function validateClipRange(startSeconds: number, endSeconds: number, dura
 }
 
 export async function getVideoMetadata(url: string): Promise<VideoMetadata> {
+  const ytDlpBinary = await resolveBinaryPath("yt-dlp");
   const videoId = parseYouTubeVideoId(url);
   if (!videoId) {
     throw new UserInputError("Please provide a valid YouTube URL.");
   }
 
-  const { stdout } = await runCommand("yt-dlp", [
+  const { stdout } = await runCommand(ytDlpBinary, [
     "--dump-single-json",
     "--no-warnings",
     "--no-playlist",
@@ -98,6 +106,8 @@ export async function createClipFromYouTube(options: {
   startSeconds: number;
   endSeconds: number;
 }): Promise<{ outputFilePath: string; cleanup: () => Promise<void> }> {
+  const ytDlpBinary = await resolveBinaryPath("yt-dlp");
+  const ffmpegBinary = await resolveBinaryPath("ffmpeg");
   const metadata = await getVideoMetadata(options.url);
   validateClipRange(options.startSeconds, options.endSeconds, metadata.duration);
 
@@ -113,7 +123,7 @@ export async function createClipFromYouTube(options: {
   };
 
   try {
-    await runCommand("yt-dlp", [
+    await runCommand(ytDlpBinary, [
       "--no-warnings",
       "--no-playlist",
       "-f",
@@ -127,7 +137,7 @@ export async function createClipFromYouTube(options: {
 
     const sourceFilePath = await resolveDownloadedSourceFile(workspaceDir);
 
-    await runCommand("ffmpeg", [
+    await runCommand(ffmpegBinary, [
       "-y",
       "-ss",
       String(options.startSeconds),
@@ -214,6 +224,25 @@ async function runCommand(command: string, args: string[]): Promise<CommandResul
       reject(new Error(`${command} exited with code ${code}. ${stderr || stdout}`));
     });
   });
+}
+
+async function resolveBinaryPath(binary: "yt-dlp" | "ffmpeg"): Promise<string> {
+  const candidates = [binary, ...BINARY_PATH_OVERRIDES[binary]].filter((value) => value.length > 0);
+  const versionArgs = binary === "ffmpeg" ? ["-version"] : ["--version"];
+
+  for (const candidate of candidates) {
+    try {
+      await runCommand(candidate, versionArgs);
+      return candidate;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  const envHint = binary === "ffmpeg" ? "FFMPEG_PATH" : "YT_DLP_PATH";
+  throw new Error(
+    `${binary} is not installed or not available in PATH. Please install ${binary} before running this app. You can also set ${envHint} to an absolute binary path.`,
+  );
 }
 
 export async function readFileAsBuffer(filePath: string): Promise<Buffer> {
