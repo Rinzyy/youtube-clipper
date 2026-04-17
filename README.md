@@ -1,36 +1,130 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# YouTube Clipper (MVP)
 
-## Getting Started
+Local-first web app to clip a specific timerange from a YouTube video and download it as MP4.
 
-First, run the development server:
+Built with Next.js (App Router) and Node.js route handlers.
+
+## Features
+
+- Paste a YouTube URL and fetch metadata (title, duration, thumbnail)
+- Preview the video in-app before clipping
+- Choose clip range with sliders and `mm:ss` inputs
+- Set start/end from the current playback time
+- Download clipped output as MP4
+- Temporary server-side file workspace with cleanup
+
+## Tech Stack
+
+- Next.js 16 (App Router)
+- TypeScript
+- `yt-dlp` for media retrieval
+- `ffmpeg` for clipping/transcoding
+
+## Prerequisites
+
+Install the following binaries on your machine and ensure they are available in your PATH:
+
+- `yt-dlp`
+- `ffmpeg`
+
+### macOS (Homebrew)
+
+```bash
+brew install yt-dlp ffmpeg
+```
+
+Verify installation:
+
+```bash
+yt-dlp --version
+ffmpeg -version
+```
+
+## Local Development
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Start the app:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+3. Open:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`http://localhost:3000`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## How to Use
 
-## Learn More
+1. Paste a valid YouTube URL.
+2. Click **Load Video**.
+3. Use sliders and/or `mm:ss` inputs to set start/end.
+4. Optionally use **Set Start from Current** / **Set End from Current** while previewing.
+5. Click **Download Clip** to generate and download MP4.
 
-To learn more about Next.js, take a look at the following resources:
+## API Overview
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### `POST /api/video/metadata`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Input:
 
-## Deploy on Vercel
+```json
+{ "url": "https://www.youtube.com/watch?v=..." }
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Output:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```json
+{
+  "title": "Video title",
+  "duration": 372,
+  "thumbnail": "https://...",
+  "videoId": "abcdefghijk"
+}
+```
+
+### `POST /api/video/clip`
+
+Input:
+
+```json
+{
+  "url": "https://www.youtube.com/watch?v=...",
+  "startSeconds": 15,
+  "endSeconds": 62
+}
+```
+
+Response: MP4 file stream/download.
+
+## Current MVP Limits
+
+- MP4 output only
+- Max clip length: 5 minutes
+- Local usage only (no auth, no cloud job queue)
+
+## Troubleshooting
+
+- `yt-dlp is not installed or not available in PATH`
+  - Install with Homebrew (`brew install yt-dlp`) and restart the dev server.
+- `ffmpeg is not installed or not available in PATH`
+  - Install with Homebrew (`brew install ffmpeg`) and restart the dev server.
+
+## Open Source Notes
+
+- Please respect YouTube Terms of Service and copyright laws in your jurisdiction.
+- This project is intended for legitimate personal workflow and educational use.
+
+## Contributing
+
+Issues and pull requests are welcome.
+
+Suggested local check before opening a PR:
+
+```bash
+npm run lint
+```
